@@ -107,28 +107,52 @@ st.markdown('---')
 st.markdown('### Proyección de incremento de ventas por aseguradora (2023-2025)')
 
 if not df_filtered.empty and 'Fin de vigencia' in df_filtered.columns and df_filtered['Fin de vigencia'].notna().any():
+    # Extraer el año y asegurar que sea entero
     df_filtered['Año'] = df_filtered['Fin de vigencia'].dt.year
+    
+    # CONSOLIDACIÓN: Agrupar ÚNICAMENTE por Aseguradora y Año para evitar duplicados por divisa
     ventas_actuales_anuales = df_filtered.groupby(['Aseguradora', 'Año'])['Prima neta'].sum().reset_index()
     
-    df_proyeccion = ventas_actuales_anuales.copy()
+    # Crear una lista para almacenar la proyección limpia
+    lista_proyeccion = []
     
-    for aseguradora in df_proyeccion['Aseguradora'].unique():
-        sales_2023_row = df_proyeccion[(df_proyeccion['Aseguradora'] == aseguradora) & (df_proyeccion['Año'] == 2023)]
-        sales_2023 = sales_2023_row['Prima neta'].sum() if not sales_2023_row.empty else 0
-
-        if sales_2023 == 0:
-            avg_sales = df_proyeccion[df_proyeccion['Aseguradora'] == aseguradora]['Prima neta'].mean()
-            sales_2023 = avg_sales if not pd.isna(avg_sales) else 100000
-
+    # Procesar aseguradora por aseguradora de forma limpia
+    for aseguradora in ventas_actuales_anuales['Aseguradora'].unique():
+        df_aseg = ventas_actuales_anuales[ventas_actuales_anuales['Aseguradora'] == aseguradora]
+        
+        # Intentar obtener el valor real de 2023
+        sales_2023_row = df_aseg[df_aseg['Año'] == 2023]
+        
+        if not sales_2023_row.empty:
+            sales_2023 = sales_2023_row['Prima neta'].values[0]
+        else:
+            # Si no hay 2023, tomar el promedio general de lo que haya para esa aseguradora
+            sales_2023 = df_aseg['Prima neta'].mean() if not df_aseg.empty else 100000
+            
+        # Guardar el punto base de 2023
+        lista_proyeccion.append({'Aseguradora': aseguradora, 'Año': 2023, 'Prima neta': sales_2023})
+        
+        # Calcular proyecciones limpias año con año
         sales_2024 = sales_2023 * 1.10
-        df_proyeccion = pd.concat([df_proyeccion, pd.DataFrame([{'Aseguradora': aseguradora, 'Año': 2024, 'Prima neta': sales_2024}])], ignore_index=True)
-
+        lista_proyeccion.append({'Aseguradora': aseguradora, 'Año': 2024, 'Prima neta': sales_2024})
+        
         sales_2025 = sales_2024 * 1.10
-        df_proyeccion = pd.concat([df_proyeccion, pd.DataFrame([{'Aseguradora': aseguradora, 'Año': 2025, 'Prima neta': sales_2025}])], ignore_index=True)
-
-    fig_incremento = px.line(df_proyeccion, x='Año', y='Prima neta', color='Aseguradora',
-                             title='Proyección de Ventas por Aseguradora (2023-2025)',
+        lista_proyeccion.append({'Aseguradora': aseguradora, 'Año': 2025, 'Prima neta': sales_2025})
+        
+    # Convertir la lista limpia a un nuevo DataFrame
+    df_proyeccion_limpia = pd.DataFrame(lista_proyeccion)
+    
+    # Asegurar que el eje X se muestre como años enteros (sin decimales .5)
+    df_proyeccion_limpia['Año'] = df_proyeccion_limpia['Año'].astype(int)
+    
+    # Dibujar la gráfica con los datos completamente limpios
+    fig_incremento = px.line(df_proyeccion_limpia, x='Año', y='Prima neta', color='Aseguradora',
+                             title='Proyección de Ventas Limpia por Aseguradora (2023-2025)',
                              markers=True, template='plotly_white')
+    
+    # Forzar a que el eje X solo ponga marcas en los años 2023, 2024 y 2025
+    fig_incremento.update_layout(xaxis=dict(tickmode='array', tickvals=[2023, 2024, 2025]))
+    
     st.plotly_chart(fig_incremento, use_container_width=True)
 else:
     st.info('Nota: No hay fechas válidas en "Fin de vigencia" para calcular la línea temporal histórica. Se muestra vacío.')
