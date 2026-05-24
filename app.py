@@ -170,3 +170,36 @@ if not df_filtered.empty and 'Divisa' in df_filtered.columns:
     st.plotly_chart(fig_divisa, use_container_width=True)
 else:
     st.info('Falta la columna Divisa en los datos.')
+# --- SECCIÓN PREMIUM: ALERTAS DE PROXIMIDAD DE VENCIMIENTOS ---
+st.markdown('---')
+st.markdown('### 🚨 Alertas Operativas: Próximas Pólizas por Vencer')
+
+if not df_filtered.empty and 'Fin de vigencia' in df_filtered.columns:
+    # Obtener la fecha de hoy limpia (sin horas)
+    hoy = pd.to_datetime('today').normalize()
+    
+    # Filtrar pólizas cuya fecha de fin de vigencia sea a partir de hoy
+    polizas_futuras = df_filtered[df_filtered['Fin de vigencia'] >= hoy]
+    
+    if not polizas_futuras.empty:
+        # Ordenar de la más cercana a la más lejana y tomar las 5 primeras
+        top_vencimientos = polizas_futuras.sort_values(by='Fin de vigencia').head(5).copy()
+        
+        st.write("💡 *Acción comercial recomendada:* Las siguientes 5 pólizas están próximas a expirar. Se sugiere contactar al cliente para gestionar la renovación de inmediato.")
+        
+        # Formatear la fecha para que se vea limpia (AAAA-MM-DD)
+        top_vencimientos['Fin de vigencia'] = top_vencimientos['Fin de vigencia'].dt.strftime('%Y-%m-%d')
+        
+        # Columnas que queremos mostrar en la tabla de alertas
+        columnas_tabla = ['Aseguradora', 'Ramo', 'Prima neta', 'Divisa', 'Fin de vigencia']
+        cols_visibles = [c for c in columnas_tabla if c in top_vencimientos.columns]
+        
+        # Mostrar la tabla estilizada y con el dinero bien formateado
+        st.dataframe(
+            top_vencimientos[cols_visibles].style.format({'Prima neta': '${:,.2f}'}), 
+            use_container_width=True
+        )
+    else:
+        st.info("📅 No se detectaron pólizas con fechas de vencimiento futuras bajo los filtros seleccionados.")
+else:
+    st.info("⚠️ No se puede calcular el análisis de proximidad porque falta la columna 'Fin de vigencia'.")
