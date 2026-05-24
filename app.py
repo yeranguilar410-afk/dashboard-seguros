@@ -31,7 +31,7 @@ def load_data(file_path):
     return df
 
 # USAMOS EL NOMBRE QUE TIENE TU ARCHIVO EN GITHUB
-file_path = 'datos_limpios.csv'
+file_path = 'aseguradoras_limpio.csv'
 df = load_data(file_path)
 
 # --- Sidebar para filtros ---
